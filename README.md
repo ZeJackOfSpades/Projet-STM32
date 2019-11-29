@@ -11,3 +11,16 @@ le but est de créer une centrale météo
 6.	Les résultats pourrons être communiqué par UART vers le PC pour le retour d’information.
 7.	Un bouton URGENCE forcera le démarrage du moteur.
 
+## Interfaces
+- [x] 1 I2C
+- [x] 1 SPI
+- [x] 1 timer avec 2 channels pour la génération de 2 PWM (avec IT???)
+	* PWM pour le buzzer
+	* PWM pour le moteur
+- [x] 1 UART
+- [x] (4 + 1 GPIO IT) + 1 GPIO pour le NSS du SPI = 6 GPIOs
+
+## NOTES
+Attention aux niveaux de priorités !!! 
+
+
