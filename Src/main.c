@@ -455,12 +455,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 	//Moins on en fait ici mieux c'est (histoire d'un flag par exemple)
 	static uint8_t maxSpeed = 0;
 	static uint32_t lastTick = 0;
-	static uint32_t currentTick = 300;
+	static uint32_t currentTick = 0;
 
 	currentTick = HAL_GetTick();
 	if(currentTick > (lastTick + 300)){
 		//HAL_Delay(10); // Problem priority check HAL_init() (the tick is set at 3 and by default 0 for nvic)*
-		HAL_GetTick();
+		//HAL_GetTick();
 		printf("GPIO_Pin : %d \n",GPIO_Pin);
 		if(GPIO_Pin == BTN1_Pin){
 			puts("BTN1\n");
@@ -477,7 +477,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 		}
 		if(GPIO_Pin == BTN4_Pin){
 			puts("BTN4\n");
-			if(pulseEngine>400)
+			if(pulseEngine>500)
 				pulseEngine-=50;
 			set_PWM_TIM_ENGINE(pulseEngine);
 		}
