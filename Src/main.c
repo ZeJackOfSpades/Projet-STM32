@@ -129,21 +129,24 @@ int main(void)
 	//HAL_UART_Transmit(&huart2, (uint8_t*)message, (uint16_t)strlen(message), 100);
 	//Ce printf sera redirige vers l'UART (redefinition de _write)
 	printf("End of configuration \n");
+
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1)
 	{
-		/* USER CODE END WHILE */
 		HAL_I2C_Mem_Read(&hi2c1, 0x9F,0x00, 1,bufferReceive,2,2000);
 		BCD_Write(0x01, (bufferReceive[0] > 0 ? 0x0F : 0x0A));
 		BCD_Write(0x02, (bufferReceive[0]/100)%10);
 		BCD_Write(0x03, ((bufferReceive[0]/10)%10));
 		BCD_Write(0x04, (bufferReceive[0]%10));
 		printf("La temperature est de %d\n",bufferReceive[0]);
+		//HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_1); //Moteur
 
+		//HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_2); //BUZZ
 		HAL_Delay(250);
+		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
 	}
@@ -281,7 +284,7 @@ static void MX_TIM3_Init(void)
 
 	/* USER CODE END TIM3_Init 1 */
 	htim3.Instance = TIM3;
-	htim3.Init.Prescaler = 31999;
+	htim3.Init.Prescaler = 31;
 	htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
 	htim3.Init.Period = 1000;
 	htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -306,7 +309,7 @@ static void MX_TIM3_Init(void)
 		Error_Handler();
 	}
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
-	sConfigOC.Pulse = 500;
+	sConfigOC.Pulse = 400;
 	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
 	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
 	if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -448,26 +451,32 @@ static void BCD_Example(void){
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 	//uint8_t l_p8Bus[2] = {0x0F,0x01};
 	//Moins on en fait ici mieux c'est (histoire d'un flag par exemple)
-	HAL_Delay(20); // Problem priority check HAL_init() (the tick is set at 3 and by default 0 for nvic)*
-
-	printf("GPIO_Pin : %d \n",GPIO_Pin);
-	if(GPIO_Pin == BTN1_Pin){
-		puts("BTN1\n");
+	static uint32_t lastTick = 0;
+	static uint32_t currentTick = 300;
+	currentTick = HAL_GetTick();
+	if(currentTick > (lastTick + 300)){
+		//HAL_Delay(10); // Problem priority check HAL_init() (the tick is set at 3 and by default 0 for nvic)*
+		HAL_GetTick();
+		printf("GPIO_Pin : %d \n",GPIO_Pin);
+		if(GPIO_Pin == BTN1_Pin){
+			puts("BTN1\n");
+		}
+		if(GPIO_Pin == BTN2_Pin){
+			puts("BTN2\n");
+		}
+		if(GPIO_Pin == BTN3_Pin){
+			puts("BTN3\n");
+		}
+		if(GPIO_Pin == BTN4_Pin){
+			puts("BTN4\n");
+		}
+		puts("INTERRUPT\n");
+		BCD_Write(0x01, 0x0E);
+		BCD_Write(0x02, 0x0E);
+		BCD_Write(0x03, 0x0E);
+		BCD_Write(0x04, 0x0E);
+		lastTick = HAL_GetTick();
 	}
-	if(GPIO_Pin == BTN2_Pin){
-		puts("BTN2\n");
-	}
-	if(GPIO_Pin == BTN3_Pin){
-		puts("BTN3\n");
-	}
-	if(GPIO_Pin == BTN4_Pin){
-		puts("BTN4\n");
-	}
-	puts("INTERRUPT\n");
-	BCD_Write(0x01, 0x0E);
-	BCD_Write(0x02, 0x0E);
-	BCD_Write(0x03, 0x0E);
-	BCD_Write(0x04, 0x0E);
 	//HAL_Delay(5000);
 }
 /* USER CODE END 4 */
@@ -479,6 +488,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 void Error_Handler(void)
 {
 	/* USER CODE BEGIN Error_Handler_Debug */
+	//TODO Fix before release
+	while(1);
 	/* User can add his own implementation to report the HAL error return state */
 
 	/* USER CODE END Error_Handler_Debug */
