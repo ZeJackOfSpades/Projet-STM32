@@ -115,6 +115,9 @@ int main(void)
 	HAL_Delay(1000);
 	BCD_Example();
 	HAL_NVIC_SetPriority(EXTI15_10_IRQn, 6, 0);
+	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 6, 0);
+	HAL_NVIC_SetPriority(TIM3_IRQn, 3, 0);
+
 	HAL_Delay(1000);
 	BCD_Write(0x01, 0x0A);
 	BCD_Write(0x02, 0x0A);
@@ -138,7 +141,7 @@ int main(void)
 		BCD_Write(0x02, (bufferReceive[0]/100)%10);
 		BCD_Write(0x03, ((bufferReceive[0]/10)%10));
 		BCD_Write(0x04, (bufferReceive[0]%10));
-		printf("La température est de %d\n",bufferReceive[0]);
+		printf("La temperature est de %d\n",bufferReceive[0]);
 
 		HAL_Delay(250);
 
@@ -316,6 +319,7 @@ static void MX_TIM3_Init(void)
 	}
 	/* USER CODE BEGIN TIM3_Init 2 */
 	HAL_TIM_Base_Start_IT(&htim3);
+	HAL_TIM_PWM_Init(&htim3);
 	/* USER CODE END TIM3_Init 2 */
 	HAL_TIM_MspPostInit(&htim3);
 
@@ -445,6 +449,19 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 	//uint8_t l_p8Bus[2] = {0x0F,0x01};
 	//Moins on en fait ici mieux c'est (histoire d'un flag par exemple)
 	HAL_Delay(10); // Problem priority check HAL_init() (the tick is set at 3 and by default 0 for nvic)*
+	printf("GPIO_Pin : %d \n",GPIO_Pin);
+	if(GPIO_Pin == BTN1_Pin){
+		puts("BTN1\n");
+	}
+	if(GPIO_Pin == BTN2_Pin){
+		puts("BTN2\n");
+	}
+	if(GPIO_Pin == BTN3_Pin){
+		puts("BTN3\n");
+	}
+	if(GPIO_Pin == BTN4_Pin){
+		puts("BTN4\n");
+	}
 	puts("INTERRUPT\n");
 	BCD_Write(0x01, 0x0E);
 	BCD_Write(0x02, 0x0E);
