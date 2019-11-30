@@ -448,7 +448,8 @@ static void BCD_Example(void){
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 	//uint8_t l_p8Bus[2] = {0x0F,0x01};
 	//Moins on en fait ici mieux c'est (histoire d'un flag par exemple)
-	HAL_Delay(10); // Problem priority check HAL_init() (the tick is set at 3 and by default 0 for nvic)*
+	HAL_Delay(20); // Problem priority check HAL_init() (the tick is set at 3 and by default 0 for nvic)*
+
 	printf("GPIO_Pin : %d \n",GPIO_Pin);
 	if(GPIO_Pin == BTN1_Pin){
 		puts("BTN1\n");
