@@ -67,6 +67,8 @@ static void MX_USART2_UART_Init(void);
 static void BCD_Write(volatile uint8_t _u8Addr, volatile uint8_t _8Data);
 static void BCD_Init(void);
 static void BCD_Example(void);
+void set_PWM_TIM_ENGINE(uint32_t Pulse);
+void set_PWM_TIM_BUZZ(uint32_t Pulse);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -142,7 +144,7 @@ int main(void)
 		BCD_Write(0x03, ((bufferReceive[0]/10)%10));
 		BCD_Write(0x04, (bufferReceive[0]%10));
 		printf("La temperature est de %d\n",bufferReceive[0]);
-		//HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_1); //Moteur
+		HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_1); //Moteur
 
 		//HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_2); //BUZZ
 		HAL_Delay(250);
@@ -460,9 +462,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 		printf("GPIO_Pin : %d \n",GPIO_Pin);
 		if(GPIO_Pin == BTN1_Pin){
 			puts("BTN1\n");
+			set_PWM_TIM_ENGINE(999);
 		}
 		if(GPIO_Pin == BTN2_Pin){
 			puts("BTN2\n");
+			set_PWM_TIM_ENGINE(450);
 		}
 		if(GPIO_Pin == BTN3_Pin){
 			puts("BTN3\n");
@@ -479,6 +483,33 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 	}
 	//HAL_Delay(5000);
 }
+
+void set_PWM_TIM_ENGINE(uint32_t Pulse){
+	TIM_OC_InitTypeDef sConfigOC = {0};
+
+	sConfigOC.OCMode = TIM_OCMODE_PWM1;
+	sConfigOC.Pulse = Pulse;
+	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+	if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+}
+void set_PWM_TIM_BUZZ(uint32_t Pulse){
+	TIM_OC_InitTypeDef sConfigOC = {0};
+
+	sConfigOC.OCMode = TIM_OCMODE_PWM1;
+	sConfigOC.Pulse = Pulse;
+	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+	if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+	{
+		Error_Handler();
+	}
+}
+
 /* USER CODE END 4 */
 
 /**
