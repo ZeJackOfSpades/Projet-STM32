@@ -34,6 +34,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define MCP980x_I2C_ADDR_R    (0x9F)
+#define MCP980x_I2C_ADDR_W    (0x9E)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -62,7 +64,9 @@ static void MX_SPI1_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
-
+static void BCD_Write(volatile uint8_t _u8Addr, volatile uint8_t _8Data);
+static void BCD_Init(void);
+static void BCD_Example(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -77,7 +81,7 @@ static void MX_USART2_UART_Init(void);
 int main(void)
 {
 	/* USER CODE BEGIN 1 */
-	uint8_t l_pu8data[2]={0xBB,0xAA};
+	uint8_t bufferReceive[2]={0};
 	/* USER CODE END 1 */
 
 
@@ -104,12 +108,24 @@ int main(void)
 	MX_TIM3_Init();
 	MX_USART2_UART_Init();
 	/* USER CODE BEGIN 2 */
-	char message[35];
 
-	snprintf(message,35, "La temperature est : %d Celsius\n", 35);
-	HAL_UART_Transmit(&huart2, (uint8_t*)message, (uint16_t)strlen(message), 100);
-	//HAL_UART_Transmit(&huart2, l_pu8data, 2 , 1000);
+	BCD_Init();
+	//HAL_GetTick();
+	//BCD_Write(0x01,0x0C);
+	HAL_Delay(1000);
+	BCD_Example();
+	//HAL_NVIC_SetPriority(EXTI15_10_IRQn, 6, 0);
+	HAL_Delay(1000);
+	BCD_Write(0x01, 0x0A);
+	BCD_Write(0x02, 0x0A);
+	BCD_Write(0x03, 0x0A);
+	BCD_Write(0x04, 0x0A);
+	HAL_Delay(1000);
 
+	//snprintf(message,35, "La temperature est : %d Celsius\n", 35);
+	//HAL_UART_Transmit(&huart2, (uint8_t*)message, (uint16_t)strlen(message), 100);
+	//Ce printf sera redirige vers l'UART (redefinition de _write)
+	printf("End of configuration \n");
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
@@ -117,6 +133,14 @@ int main(void)
 	while (1)
 	{
 		/* USER CODE END WHILE */
+		HAL_I2C_Mem_Read(&hi2c1, 0x9F,0x00, 1,bufferReceive,2,2000);
+		BCD_Write(0x01, (bufferReceive[0] > 0 ? 0x0F : 0x0A));
+		BCD_Write(0x02, (bufferReceive[0]/100)%10);
+		BCD_Write(0x03, ((bufferReceive[0]/10)%10));
+		BCD_Write(0x04, (bufferReceive[0]%10));
+		printf("La température est de %d\n",bufferReceive[0]);
+
+		HAL_Delay(250);
 
 		/* USER CODE BEGIN 3 */
 	}
@@ -387,7 +411,46 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+int _write(int file, char *ptr, int len)
+{
+	HAL_UART_Transmit(&huart2, (uint8_t *)ptr, len, 10);
+	return len;
+}
+static void BCD_Write(volatile uint8_t _u8Addr, volatile uint8_t _u8Data){
+	uint8_t l_pu8Word[2];
 
+	l_pu8Word[0] = _u8Addr; //Invert the order if 8 bits mod
+	l_pu8Word[1] = _u8Data;
+
+	HAL_GPIO_WritePin(NSS_GPIO_Port, NSS_Pin, GPIO_PIN_RESET);
+	HAL_SPI_Transmit(&hspi1, l_pu8Word, 2, HAL_TIMEOUT);
+	HAL_GPIO_WritePin(NSS_GPIO_Port, NSS_Pin, GPIO_PIN_SET);
+
+
+}
+static void BCD_Init(void){
+	BCD_Write(0x0C, 0x01); // Exit the shutdown mode
+	BCD_Write(0x0B, 0x03);// 4 digits (from 0 to 3) scan limit
+	BCD_Write(0x0A, 0x0B);// Set brightness (11/16)
+	BCD_Write(0x09, 0x0F);// Set code B
+}
+
+static void BCD_Example(void){
+	BCD_Write(0x01, 0x06);
+	BCD_Write(0x02, 0x06);
+	BCD_Write(0x03, 0x06);
+	BCD_Write(0x04, 0x06);
+}
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
+	//uint8_t l_p8Bus[2] = {0x0F,0x01};
+	//Moins on en fait ici mieux c'est (histoire d'un flag par exemple)
+	HAL_Delay(10); // Problem priority check HAL_init() (the tick is set at 3 and by default 0 for nvic)
+	BCD_Write(0x01, 0x0E);
+	BCD_Write(0x02, 0x0E);
+	BCD_Write(0x03, 0x0E);
+	BCD_Write(0x04, 0x0E);
+	//HAL_Delay(5000);
+}
 /* USER CODE END 4 */
 
 /**
