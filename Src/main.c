@@ -114,7 +114,7 @@ int main(void)
 	//BCD_Write(0x01,0x0C);
 	HAL_Delay(1000);
 	BCD_Example();
-	//HAL_NVIC_SetPriority(EXTI15_10_IRQn, 6, 0);
+	HAL_NVIC_SetPriority(EXTI15_10_IRQn, 6, 0);
 	HAL_Delay(1000);
 	BCD_Write(0x01, 0x0A);
 	BCD_Write(0x02, 0x0A);
@@ -444,7 +444,8 @@ static void BCD_Example(void){
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 	//uint8_t l_p8Bus[2] = {0x0F,0x01};
 	//Moins on en fait ici mieux c'est (histoire d'un flag par exemple)
-	HAL_Delay(10); // Problem priority check HAL_init() (the tick is set at 3 and by default 0 for nvic)
+	HAL_Delay(10); // Problem priority check HAL_init() (the tick is set at 3 and by default 0 for nvic)*
+	puts("INTERRUPT\n");
 	BCD_Write(0x01, 0x0E);
 	BCD_Write(0x02, 0x0E);
 	BCD_Write(0x03, 0x0E);
