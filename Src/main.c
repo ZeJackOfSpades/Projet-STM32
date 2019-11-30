@@ -53,7 +53,7 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+volatile uint32_t pulseEngine = 500;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -143,7 +143,7 @@ int main(void)
 		BCD_Write(0x02, (bufferReceive[0]/100)%10);
 		BCD_Write(0x03, ((bufferReceive[0]/10)%10));
 		BCD_Write(0x04, (bufferReceive[0]%10));
-		printf("La temperature est de %d\n",bufferReceive[0]);
+		printf("La temperature : %d, engine speed %lu\n",bufferReceive[0], pulseEngine);
 		HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_1); //Moteur
 
 		//HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_2); //BUZZ
@@ -453,8 +453,10 @@ static void BCD_Example(void){
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 	//uint8_t l_p8Bus[2] = {0x0F,0x01};
 	//Moins on en fait ici mieux c'est (histoire d'un flag par exemple)
+	static uint8_t maxSpeed = 0;
 	static uint32_t lastTick = 0;
 	static uint32_t currentTick = 300;
+
 	currentTick = HAL_GetTick();
 	if(currentTick > (lastTick + 300)){
 		//HAL_Delay(10); // Problem priority check HAL_init() (the tick is set at 3 and by default 0 for nvic)*
@@ -462,18 +464,33 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 		printf("GPIO_Pin : %d \n",GPIO_Pin);
 		if(GPIO_Pin == BTN1_Pin){
 			puts("BTN1\n");
-			set_PWM_TIM_ENGINE(999);
 		}
 		if(GPIO_Pin == BTN2_Pin){
 			puts("BTN2\n");
-			set_PWM_TIM_ENGINE(450);
+			if(pulseEngine<1000)
+				pulseEngine+=50;
+			set_PWM_TIM_ENGINE(pulseEngine);
 		}
 		if(GPIO_Pin == BTN3_Pin){
 			puts("BTN3\n");
+
 		}
 		if(GPIO_Pin == BTN4_Pin){
 			puts("BTN4\n");
+			if(pulseEngine>400)
+				pulseEngine-=50;
+			set_PWM_TIM_ENGINE(pulseEngine);
 		}
+		if(GPIO_Pin == USER_BUTTON_Pin){
+			if(0 == maxSpeed){
+				set_PWM_TIM_ENGINE(1000);
+				maxSpeed = 1 ;
+			}else{
+				set_PWM_TIM_ENGINE(pulseEngine);
+				maxSpeed = 0 ;
+			}
+		}
+
 		puts("INTERRUPT\n");
 		BCD_Write(0x01, 0x0E);
 		BCD_Write(0x02, 0x0E);
@@ -487,8 +504,19 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 void set_PWM_TIM_ENGINE(uint32_t Pulse){
 	TIM_OC_InitTypeDef sConfigOC = {0};
 
+	uint32_t l_u32Pulse = 0;
+
+	if(Pulse < 499){
+		puts("Pulse minimum for the engine is 500\n");
+		l_u32Pulse = 500;
+
+	}else if(Pulse > 1000){
+		puts("MAX speed reached ! \n");
+	}else{
+		l_u32Pulse = Pulse;
+	}
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
-	sConfigOC.Pulse = Pulse;
+	sConfigOC.Pulse = l_u32Pulse;
 	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
 	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
 	if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -499,6 +527,7 @@ void set_PWM_TIM_ENGINE(uint32_t Pulse){
 }
 void set_PWM_TIM_BUZZ(uint32_t Pulse){
 	TIM_OC_InitTypeDef sConfigOC = {0};
+	//uint32_t l_u32Pulse;
 
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
 	sConfigOC.Pulse = Pulse;
