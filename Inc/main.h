@@ -95,6 +95,9 @@ void Error_Handler(void);
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
+#define ALERT_TEMP_Pin GPIO_PIN_2
+#define ALERT_TEMP_GPIO_Port GPIOD
+#define ALERT_TEMP_EXTI_IRQn EXTI2_IRQn
 #define SWO_Pin GPIO_PIN_3
 #define SWO_GPIO_Port GPIOB
 #define PWM_ENGINE_Pin GPIO_PIN_4
