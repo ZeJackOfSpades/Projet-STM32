@@ -19,6 +19,9 @@ le but est de créer une centrale météo
 	* PWM pour le moteur
 - [x] 1 UART
 - [x] (4 + 1 GPIO IT) + 1 GPIO pour le NSS du SPI = 6 GPIOs
+## Pinout STM32-NUCLEOL152RE
+
+![50% center](Documentation/Doc ST/nucleo64_revc_l152re_pinout.png)
 
 ## NOTES
 Attention aux niveaux de priorités !!! 
