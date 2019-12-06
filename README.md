@@ -17,13 +17,14 @@ le but est de créer une centrale météo
 - [x] 1 timer avec 2 channels pour la génération de 2 PWM (avec IT???)
 	* PWM pour le buzzer
 	* PWM pour le moteur
-- [x] 1 UART
-- [x] (4 + 1 GPIO IT) + 1 GPIO pour le NSS du SPI = 6 GPIOs
+- [x] 1 USART2
+- [x] (6 GPIO IT) + 1 GPIO pour le NSS du SPI = 6 GPIOs
 ## Pinout STM32-NUCLEOL152RE
 
 ![50% center](https://github.com/ZeJackOfSpades/Projet-STM32/blob/master/Documentation/Doc%20ST/nucleo64_revc_l152re_pinout.png)
 
 ## NOTES
-Attention aux niveaux de priorités !!! 
+1. Attention aux niveaux de priorités !!! 
+2. Attention la taille des registres n'est pas la même il vaut mieux lire registre par registre sans demander à tout lire !!!
 
 
