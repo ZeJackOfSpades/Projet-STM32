@@ -21,7 +21,7 @@ le but est de créer une centrale météo
 - [x] (4 + 1 GPIO IT) + 1 GPIO pour le NSS du SPI = 6 GPIOs
 ## Pinout STM32-NUCLEOL152RE
 
-![50% center](nucleo64_revc_l152re_pinout.png)
+![50% center](https://github.com/ZeJackOfSpades/Projet-STM32/blob/master/Documentation/Doc%20ST/nucleo64_revc_l152re_pinout.png)
 
 ## NOTES
 Attention aux niveaux de priorités !!! 
