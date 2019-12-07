@@ -175,6 +175,7 @@ int main(void)
 	if(HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_TEMPLIMIT, 1, (uint8_t*)bufferReceiveTEMPLIMIT, 2, TIMEOUT)!= HAL_OK){
 		Error_Handler();
 	}
+	//Affiche sur le 7 segments (- - - -) la fin de la configuration générale
 	BCD_Write(0x01, 0x0A);
 	BCD_Write(0x02, 0x0A);
 	BCD_Write(0x03, 0x0A);
@@ -521,24 +522,33 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+/**
+ * @brief  Permet de rediriger le flux d'affichage du printf, puts etc. vers une sortie UART
+ * @brief  cette fonction est appelé automatiquement lors de l'appelle d'un printf
+ * @param  int file
+ * @param  char *ptr
+ * @param  int len
+ *
+ * @retval void
+ */
 int _write(int file, char *ptr, int len)
 {
 	HAL_UART_Transmit(&huart2, (uint8_t *)ptr, len, 10);
 	return len;
 }
 /**
-  * @brief  Ecrit sur le bus SPI à l'adress correspondante et avec les datas
-  * @param  volatile uint8_t _u8Data
-  * @param  volatile uint8_t _u8Addr
-  *
-  * @retval void
-  */
+ * @brief  Ecrit sur le bus SPI à l'adress correspondante et avec les datas
+ * @param  volatile uint8_t _u8Data
+ * @param  volatile uint8_t _u8Addr
+ *
+ * @retval void
+ */
 static void BCD_Write(volatile uint8_t _u8Addr, volatile uint8_t _u8Data){
 	uint8_t l_pu8Word[2];
 
 	l_pu8Word[0] = _u8Addr; //Invert the order if 8 bits mod
 	l_pu8Word[1] = _u8Data;
-
+	//Reset la pin NSS pour signaler qu'on va écrire sur le bus
 	HAL_GPIO_WritePin(NSS_GPIO_Port, NSS_Pin, GPIO_PIN_RESET);
 	if(HAL_SPI_Transmit(&hspi1, l_pu8Word, 2, HAL_TIMEOUT)!= HAL_OK){
 		Error_Handler();
@@ -548,10 +558,10 @@ static void BCD_Write(volatile uint8_t _u8Addr, volatile uint8_t _u8Data){
 
 }
 /**
-  * @brief  Permet d'initialiser les paramètres de l'afficheur
-  * @param  void
-  * @retval void
-  */
+ * @brief  Permet d'initialiser les paramètres de l'afficheur
+ * @param  void
+ * @retval void
+ */
 static void BCD_Init(void){
 	BCD_Write(0x0C, 0x01); // Exit the shutdown mode
 	BCD_Write(0x0B, 0x03);// 4 digits (from 0 to 3) scan limit
@@ -559,16 +569,27 @@ static void BCD_Init(void){
 	BCD_Write(0x09, 0x0F);// Set code B
 }
 /**
-  * @brief  Affiche 6 sur les 4 digits sur l'afficheur SPI
-  * @param  void
-  * @retval void
-  */
+ * @brief  Affiche 6 sur les 4 digits sur l'afficheur SPI
+ * @param  void
+ * @retval void
+ */
 static void BCD_Example(void){
 	BCD_Write(0x01, 0x06);
 	BCD_Write(0x02, 0x06);
 	BCD_Write(0x03, 0x06);
 	BCD_Write(0x04, 0x06);
 }
+/**
+ * @brief  Gère l'interruption du TIM2 (toutes les secondes)
+ * @brief  Récupère les données du capteur I2C et les affiche sur l'afficheur 7 seg 4 digits
+ * @brief  Si il y a une alerte température la ventilation se gère automatiquement et bloque l'utilisateur
+ * @brief	pour changer la vitesse de celle-ci.
+ * @brief	Cependant on peut activer le bouton MAXSPEED si besoin
+ * @brief	Lorsque l'alerte température n'est plus active l'utilisateur peut de nouveau changer la vitesse du moteur
+ *
+ * @param  TIM_HandleTypeDef *htim
+ * @retval void
+ */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 
 	if(HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_TEMP, 1, (uint8_t*)bufferReceiveTemp, 1, 2000)!= HAL_OK){
@@ -608,6 +629,19 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	}
 
 }
+/**
+ * @brief  Gère toutes les interruptions externes et test toutes les GPIOs
+ * @brief	Lorsqu'on rentre en interruption on affiche sur l'afficheur PPPP
+ * @brief  Si la température dépasse le seuil de la consigne la gestion de la ventilation se fait automtiquement
+ * @brief	Dans l'interruption du TIM2 seul le bouton USER(bleu sur la carte NUCLEO) active la ventilation forcée
+ * @brief	L'interruption du BTN1 augmente la consigne en température (avec Hysteresis egalement)
+ * @brief	L'interruption du BTN3 baisse la consigne en température (avec Hysteresis egalement)
+ * @brief	L'interruption du BTN2 augmente la vitesse du moteur
+ * @brief	L'interruption du BTN4 baisse la vitesse du moteur
+ *
+ * @param  uint16_t GPIO_Pin
+ * @retval void
+ */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 	static uint32_t lastTick = 0;
 	static uint32_t currentTick = 0;
@@ -638,7 +672,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 			puts("BTN2\n");
 			if(pulseEngine < MAXSPEED){
 				maxSpeed = 0;
-				pulseEngine+=50;
+				if(flagAlerteTemperature == FIN_ALERTE_TEMPERATURE){
+					pulseEngine+=50;
+				}
 				pwmEngine = ACTIF;
 			}else{
 				maxSpeed = 1;
@@ -663,15 +699,16 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 		if(GPIO_Pin == BTN4_Pin){
 			puts("BTN4\n");
 			if(pulseEngine >= MINSPEED){
-				pulseEngine-=50;
-				pwmEngine = ACTIF;
 				if(FIN_ALERTE_TEMPERATURE == flagAlerteTemperature){
+					pwmEngine = ACTIF;
+					pulseEngine-=50;
 					set_PWM_TIM_ENGINE(pulseEngine, ACTIF);
 				}
 			}else{
-				pwmEngine = DESACTIVE;
+
 				if(FIN_ALERTE_TEMPERATURE == flagAlerteTemperature){
 					set_PWM_TIM_ENGINE(0, DESACTIVE);
+					pwmEngine = DESACTIVE;
 				}
 
 			}
@@ -691,18 +728,25 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 				puts("ALERTE TEMPERATURE ! \n");
 				flagAlerteTemperature = ALERTE_TEMPERATURE;
 				set_PWM_TIM_BUZZ(600);
-				//set_PWM_TIM_ENGINE(800,ACTIF);
 			}else{
 				flagAlerteTemperature = FIN_ALERTE_TEMPERATURE;
 				puts("FIN ALERTE TEMP\n");
 				set_PWM_TIM_BUZZ(0);
-				//set_PWM_TIM_ENGINE(0, DESACTIVE);
 			}
 		}
 		lastTick = HAL_GetTick();
 	}
 }
-
+/**
+ * @brief	Gère la pulse du PWM du MOTEUR tant que la valeur ne descends pas en dessous de MINSPEED
+ * @brief	et ne dépasse pas MAXSPEED
+ * @brief	Si on souhaite arrêter le moteur on viendra set la variable desactivate à DESACTIVE et une pulse
+ * @brief	set à 0
+ * @brief	Sinon on set desactivate à ACTIF
+ * @param	uint32_t Pulse
+ * @param	uint8_t desactivate
+ * @retval	void
+ */
 void set_PWM_TIM_ENGINE(uint32_t Pulse, uint8_t desactivate){
 	TIM_OC_InitTypeDef sConfigOC = {0};
 	uint32_t l_u32Pulse = 0;
@@ -726,6 +770,14 @@ void set_PWM_TIM_ENGINE(uint32_t Pulse, uint8_t desactivate){
 	}
 
 }
+
+/**
+ * @brief	Gère la pulse du PWM du MOTEUR en fonction de value
+ * @brief	Cette fonction set up la vitesse du moteur en fonction de l'écart
+ * @brief	de température. Cette fonction est implémentée dans l'interruption de TIM2
+ * @param	uint16_t value
+ * @retval	void
+ */
 void UpdatePulse(uint16_t value)
 {
 	// Fonction pour gérer automatiquement la vitesse du moteur
@@ -734,6 +786,8 @@ void UpdatePulse(uint16_t value)
 	if(( MINSPEED + value * 200)>1000){
 		sConfigOC.Pulse = 1000;
 	}else if (( MINSPEED + value * 200) < 0){
+		sConfigOC.Pulse = (uint32_t)( MINSPEED );
+	}else if (value < 0){
 		sConfigOC.Pulse = (uint32_t)( MINSPEED );
 	}else{
 		sConfigOC.Pulse = (uint32_t)( MINSPEED + value * 200);
@@ -748,6 +802,11 @@ void UpdatePulse(uint16_t value)
 
 	HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_1);
 }
+/**
+ * @brief	Gère la pulse du PWM du Buzzer en fonction de pulse
+ * @param	uint32_t Pulse
+ * @retval	void
+ */
 void set_PWM_TIM_BUZZ(uint32_t Pulse){
 	TIM_OC_InitTypeDef sConfigOC = {0};
 
@@ -761,6 +820,13 @@ void set_PWM_TIM_BUZZ(uint32_t Pulse){
 	}
 }
 
+/**
+ * @brief	Affiche la température sur l'afficheur en fonction de temperature
+ * @brief	Cette fonction est implémentée lorsqu'on configure la consigne en température seulement
+ * @brief	Affiche un P. sur le premier digit pour signifier qu'on "Programme" le thermostat
+ * @param	uint16_t temperature
+ * @retval	void
+ */
 // D7 | D6 | D5 | D4 | D3 | D2 | D1 | D0
 // DP | A  | B  | C  | D  | E  | F  | G
 // 1    1    0    0    1    1    1    0
