@@ -49,9 +49,13 @@ enum    E_MCP980x_REGISTERS
 
 #define DESACTIVE 1
 #define ACTIF 0
+#define MINSPEED 300
+#define MAXSPEED 1000
 
 #define ALERTE_TEMPERATURE 	1
 #define FIN_ALERTE_TEMPERATURE	0
+
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -70,7 +74,7 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-volatile uint32_t pulseEngine = 300;
+volatile uint32_t pulseEngine = MINSPEED;
 volatile uint8_t maxSpeed = 0;
 volatile uint8_t desactivate = 0;
 volatile uint8_t consigneTemp = 30;
@@ -146,8 +150,7 @@ int main(void)
 	/* USER CODE BEGIN 2 */
 
 	BCD_Init();
-	//HAL_GetTick();
-	//BCD_Write(0x01,0x0C);
+
 	HAL_Delay(1000);
 	BCD_Example();
 	HAL_NVIC_SetPriority(EXTI2_IRQn,     5, 0);
@@ -155,19 +158,15 @@ int main(void)
 	HAL_NVIC_SetPriority(EXTI9_5_IRQn,   5, 0);
 	HAL_NVIC_SetPriority(TIM2_IRQn,      6, 0);
 
-
-
 	set_ConsigneTemperature(consigneTemp);
-	//HAL_Delay(4000);
 
 	//Ce printf sera redirige vers l'UART (redefinition de _write)
 	HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_CONF, 1, &bufferConf, 1, 2000);
-	HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_CONF, 1, bufferReceiveRegConf,1,2000);
-	HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPLIMIT, 1, (&consigneTemp), 2, 2000);
-	HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPHIST, 1, (&consigneHist), 2, 2000);
-	HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_TEMPLIMIT, 1, bufferReceiveTEMPLIMIT,2,2000);
-	//HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_TEMPLIMIT, 1, bufferReceiveTEMPLIMIT,2,2000);
-	//HAL_Delay(1000);
+	HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_CONF, 1, (uint8_t*)bufferReceiveRegConf,1,2000);
+	HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPLIMIT, 1, (uint8_t*)(&consigneTemp), 2, 2000);
+	HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPHIST, 1, (uint8_t*)(&consigneHist), 2, 2000);
+	HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_TEMPLIMIT, 1, (uint8_t*)bufferReceiveTEMPLIMIT,2,2000);
+
 	BCD_Write(0x01, 0x0A);
 	BCD_Write(0x02, 0x0A);
 	BCD_Write(0x03, 0x0A);
@@ -183,13 +182,9 @@ int main(void)
 	while (1)
 	{
 
-		//printf("Temp reg %d, REG conf %d, reg temp HIST %d, temp limit %d\n",bufferReceive[0],bufferReceive[1],bufferReceive[2],bufferReceive[3]);
-
-
 		HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_1); //Moteur
 
 		HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_2); //BUZZ
-		//HAL_Delay(500);
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
@@ -329,7 +324,7 @@ static void MX_TIM2_Init(void)
 	htim2.Instance = TIM2;
 	htim2.Init.Prescaler = 31999;
 	htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim2.Init.Period = 2000;
+	htim2.Init.Period = 1000;
 	htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 	htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 	if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -549,14 +544,46 @@ static void BCD_Example(void){
 	BCD_Write(0x04, 0x06);
 }
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_TEMP, 1, bufferReceiveTemp, 1, 2000);
-	HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_TEMPLIMIT, 1, bufferReceiveTEMPLIMIT, 1, 2000);
-	HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_TEMPHIST, 1, bufferReceiveTEMPHIST, 1, 2000);
+	static int montee = 0;
+
+	HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_TEMP, 1, (uint8_t*)bufferReceiveTemp, 1, 2000);
+	HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_TEMPLIMIT, 1, (uint8_t*)bufferReceiveTEMPLIMIT, 1, 2000);
+	HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_TEMPHIST, 1, (uint8_t*)bufferReceiveTEMPHIST, 1, 2000);
 	BCD_Write(0x01, (bufferReceiveTemp[0] > 0 ? 0x0F : 0x0A));
 	BCD_Write(0x02, (bufferReceiveTemp[0]/100)%10);
 	BCD_Write(0x03, ((bufferReceiveTemp[0]/10)%10));
 	BCD_Write(0x04, (bufferReceiveTemp[0]%10));
 	printf("Temperature : %d, ALERTE set Temp : %u, HIST %u, engine speed %lu, MAXSPEED : %u\n",bufferReceiveTemp[0],bufferReceiveTEMPLIMIT[0],bufferReceiveTEMPHIST[0], pulseEngine, maxSpeed);
+
+	if(bufferReceiveTemp[0]== (bufferReceiveTEMPLIMIT[0]+1)){
+		set_PWM_TIM_ENGINE(600, ACTIF);
+		montee = 1;
+		puts("montee 1\n");
+
+	}if(bufferReceiveTemp[0]== (bufferReceiveTEMPLIMIT[0]+2)){
+		set_PWM_TIM_ENGINE(800, ACTIF);
+		montee = 2;
+		puts("montee 2\n");
+
+	}if(bufferReceiveTemp[0]>= (bufferReceiveTEMPLIMIT[0]+3)){
+		set_PWM_TIM_ENGINE(MAXSPEED, ACTIF);
+		montee = 3;
+		puts("montee 3\n");
+
+	}if((bufferReceiveTemp[0]== (bufferReceiveTEMPLIMIT[0]+2)) && montee == 3){
+		set_PWM_TIM_ENGINE(800, ACTIF);
+		puts("Descente 3\n");
+
+	}if((bufferReceiveTemp[0]> (bufferReceiveTEMPLIMIT[0]+1)) && montee == 2){
+		set_PWM_TIM_ENGINE(600, ACTIF);
+		puts("Descente 2\n");
+
+	}if((bufferReceiveTemp[0] <= (bufferReceiveTEMPLIMIT[0]))){
+		montee = 0;
+		set_PWM_TIM_ENGINE(pulseEngine, ACTIF);
+		puts("Descente 1\n");
+
+	}
 
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
@@ -576,14 +603,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 			puts("BTN1\n");
 			consigneTemp += 1;
 			consigneHist += 1;
-			HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPLIMIT, 1, (&consigneTemp), 2, 2000);
-			HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPHIST, 1, (&consigneHist), 2, 2000);
+			HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPLIMIT, 1, (uint8_t*)(&consigneTemp), 2, 2000);
+			HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPHIST, 1, (uint8_t*)(&consigneHist), 2, 2000);
 			set_ConsigneTemperature(consigneTemp);
 
 		}
 		if(GPIO_Pin == BTN2_Pin){
 			puts("BTN2\n");
-			if(pulseEngine<1000){
+			if(pulseEngine < MAXSPEED){
 				maxSpeed = 0;
 				pulseEngine+=50;
 			}
@@ -593,21 +620,19 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 			puts("BTN3\n");
 			consigneTemp -=1;
 			consigneHist -=1;
-			HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPLIMIT, 1, (&consigneTemp), 2, 2000);
-			HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPHIST, 1, (&consigneHist), 2, 2000);
+			HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPLIMIT, 1, (uint8_t*)(&consigneTemp), 2, 2000);
+			HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPHIST, 1, (uint8_t*)(&consigneHist), 2, 2000);
 			set_ConsigneTemperature(consigneTemp);
-			//set_PWM_TIM_BUZZ(0);
-
 		}
 		if(GPIO_Pin == BTN4_Pin){
 			puts("BTN4\n");
-			if(pulseEngine>450)
+			if(pulseEngine > MINSPEED)
 				pulseEngine-=50;
 			set_PWM_TIM_ENGINE(pulseEngine, ACTIF);
 		}
 		if(GPIO_Pin == USER_BUTTON_Pin){
 			if(0 == maxSpeed){
-				set_PWM_TIM_ENGINE(1000, ACTIF);
+				set_PWM_TIM_ENGINE(MAXSPEED, ACTIF);
 				maxSpeed = 1 ;
 			}else{
 				set_PWM_TIM_ENGINE(pulseEngine, ACTIF);
@@ -618,31 +643,28 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){ //Routine d'interrupt
 			if(flagAlerteTemperature == FIN_ALERTE_TEMPERATURE){
 				puts("ALERTE TEMPERATURE ! \n");
 				flagAlerteTemperature = ALERTE_TEMPERATURE;
-				set_PWM_TIM_BUZZ(600);
+				//set_PWM_TIM_BUZZ(600);
 				set_PWM_TIM_ENGINE(800,ACTIF);
 			}else{
 				flagAlerteTemperature = FIN_ALERTE_TEMPERATURE;
 				puts("FIN ALERTE TEMP\n");
-				set_PWM_TIM_BUZZ(0);
+				//set_PWM_TIM_BUZZ(0);
 				set_PWM_TIM_ENGINE(0,DESACTIVE);
 			}
 		}
-
 		lastTick = HAL_GetTick();
 	}
-	//HAL_Delay(5000);
 }
 
 void set_PWM_TIM_ENGINE(uint32_t Pulse, uint8_t desactivate){
 	TIM_OC_InitTypeDef sConfigOC = {0};
-
 	uint32_t l_u32Pulse = 0;
 
-	if(Pulse < 300 && (desactivate != DESACTIVE)){
-		puts("Pulse minimum for the engine is 300\n");
-		l_u32Pulse = 300;
+	if(Pulse < MINSPEED && (desactivate != DESACTIVE)){
+		printf("Pulse minimum for the engine is %d\n", MINSPEED);
+		l_u32Pulse = MINSPEED;
 
-	}else if(Pulse > 1000 && (desactivate != DESACTIVE)){
+	}else if(Pulse > MAXSPEED && (desactivate != DESACTIVE)){
 		maxSpeed = 1;
 		puts("MAX speed reached ! \n");
 	}else{
@@ -660,7 +682,6 @@ void set_PWM_TIM_ENGINE(uint32_t Pulse, uint8_t desactivate){
 }
 void set_PWM_TIM_BUZZ(uint32_t Pulse){
 	TIM_OC_InitTypeDef sConfigOC = {0};
-	//uint32_t l_u32Pulse;
 
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
 	sConfigOC.Pulse = Pulse;
@@ -674,18 +695,11 @@ void set_PWM_TIM_BUZZ(uint32_t Pulse){
 // D7 | D6 | D5 | D4 | D3 | D2 | D1 | D0
 // DP | A  | B  | C  | D  | E  | F  | G
 // 1    1    0    0    1    1    1    0
-void set_ConsigneTemperature( uint16_t temperature){
-	//BCD_Write(0x09, 0x00); //set not CODE B
-	//BCD_Write(0x01, 0b00000000); //Simply for testing
-	//BCD_Write(0x01, 0b11100111); //Simply for testing = P.
-	//BCD_Write(0x01, 0b11001110); // affiche un C sur le premier digit avec le DP
-	//BCD_Write(0x09, 0x0F); //set Code B
+void set_ConsigneTemperature(uint16_t temperature){
 	BCD_Write(0x01, 0xFE); //P.
 	BCD_Write(0x02, ((temperature/100)%10));
 	BCD_Write(0x03, ((temperature/10)%10));
 	BCD_Write(0x04, (temperature%10));
-	//HAL_I2C_Mem_Read(&hi2c1, MCP980x_I2C_ADDR_R, MCP980x_I2C_REG_TEMPLIMIT, 1, bufferReceiveTEMPLIMIT,2,2000);
-	//HAL_I2C_Mem_Write(&hi2c1, MCP980x_I2C_ADDR_W, MCP980x_I2C_REG_TEMPLIMIT, 1, (&consigneTemp), 2, 2000);
 
 }
 
